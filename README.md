@@ -22,29 +22,40 @@ Built using Atlan Apps Framework with:
 - **Plotly.js**: Interactive data visualizations
 - **Atlan SDK**: Observability, logging, metrics, tracing
 
-## Setup & Installation
+## Prerequisites
 
-### Prerequisites
 - Python 3.11+
-- uv (Python package manager)
+- [uv](https://docs.astral.sh/uv/) package manager
+- [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/)
+- [Temporal CLI](https://docs.temporal.io/cli)
 
-### Installation
+### Installation Guides
+- [macOS Setup Guide](https://github.com/atlanhq/application-sdk/blob/main/docs/docs/setup/MAC.md)
+- [Linux Setup Guide](https://github.com/atlanhq/application-sdk/blob/main/docs/docs/setup/LINUX.md)
+- [Windows Setup Guide](https://github.com/atlanhq/application-sdk/blob/main/docs/docs/setup/WINDOWS.md)
 
-```bash
-# Clone the repository
-git clone [your-repo-url]
-cd excel-sourcesense
+## Quick Start
 
-# Install dependencies
-uv sync
+1. **Download required components:**
+   ```bash
+   uv run poe download-components
+   ```
 
-# Start the application
-uv run main.py
-```
+2. **Set up environment variables (see .env.example)**
+
+3. **Start dependencies (in separate terminal):**
+   ```bash
+   uv run poe start-deps
+   ```
+
+4. **Run the application:**
+   ```bash
+   uv run main.py
+   ```
 
 ### Access
 - **Web Interface**: http://localhost:8000
-- **Health Check**: http://localhost:8000/health
+- **Temporal UI**: http://localhost:8233
 
 ## Usage
 
@@ -66,18 +77,25 @@ Sample files are automatically generated:
 
 ```
 excel-sourcesense/
-├── app/                    # Core application
+├── app/                    # Core application logic
+│   ├── sql/                # SQL query templates (if needed)
 │   ├── activities.py       # Metadata extraction activities
 │   ├── clients.py          # Excel file client
 │   ├── handlers.py         # HTTP request handlers
 │   ├── transformer.py      # Atlan entity transformation
 │   └── workflows.py        # Workflow orchestration
+├── components/             # Dapr components (auto-downloaded)
 ├── frontend/               # Web interface
 │   ├── templates/          # HTML templates
 │   └── static/             # CSS, JS, assets
+├── deploy/                 # Installation and deployment files
+├── local/                  # Local data storage
+├── models/                 # Data models and schemas
 ├── uploads/                # File upload directory
 ├── sample_data/            # Sample Excel files
-└── main.py                 # Application entry point
+├── main.py                 # Application entry point
+├── pyproject.toml          # Dependencies and config
+└── README.md               # This file
 ```
 
 ## Atlan Assessment Compliance
@@ -88,6 +106,30 @@ excel-sourcesense/
 - **Quality Metrics**: Comprehensive data analysis
 - **Visualizations**: Interactive charts and graphs
 - **Professional UI**: Production-ready interface
+
+## Development
+
+### Stop Dependencies
+```bash
+uv run poe stop-deps
+```
+
+### Run Tests
+```bash
+uv run pytest
+```
+
+> **Note**: Make sure you have a `.env` file that matches the [.env.example](.env.example) file in this directory.
+
+## Learning Resources
+
+- [Atlan Application SDK Documentation](https://github.com/atlanhq/application-sdk/tree/main/docs)
+- [Excel Processing with Pandas Documentation](https://pandas.pydata.org/docs/user_guide/io.html#excel-files)
+- [Python FastAPI Documentation](https://fastapi.tiangolo.com/)
+
+## Contributing
+
+We welcome contributions! Please feel free to submit a Pull Request.
 
 ## Demo Video
 
