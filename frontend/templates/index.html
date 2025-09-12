@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel SourceSense - Metadata Extraction</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-table"></i>
+                    <h1>Excel SourceSense</h1>
+                </div>
+                <p class="subtitle">Intelligent Excel Metadata Extraction & Analysis</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h2>Upload Excel File</h2>
+                        <p>Supported formats: .xlsx, .xls, .csv (Max: 50MB)</p>
+                    </div>
+                    
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+                        <div class="upload-content">
+                            <i class="fas fa-file-excel upload-icon"></i>
+                            <p class="upload-text">Drag & drop your Excel file here</p>
+                            <p class="upload-subtext">or</p>
+                            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                                Choose File
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="sample-files">
+                        <h3>Try Sample Files:</h3>
+                        <div class="sample-buttons">
+                            <button class="sample-btn" onclick="loadSampleFile('company_data.xlsx')">
+                                <i class="fas fa-building"></i> Company Data
+                            </button>
+                            <button class="sample-btn" onclick="loadSampleFile('sales_data.csv')">
+                                <i class="fas fa-chart-line"></i> Sales Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Processing Status -->
+            <section class="status-section" id="statusSection" style="display: none;">
+                <div class="status-card">
+                    <div class="status-header">
+                        <i class="fas fa-cog fa-spin"></i>
+                        <h3 id="statusMessage">Processing Excel File...</h3>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="status-steps">
+                        <div class="step completed" id="step1">
+                            <i class="fas fa-check-circle"></i>
+                            <span>File uploaded</span>
+                        </div>
+                        <div class="step active" id="step2">
+                            <i class="fas fa-cog fa-spin"></i>
+                            <span>Extracting metadata</span>
+                        </div>
+                        <div class="step" id="step3">
+                            <i class="fas fa-circle"></i>
+                            <span>Analyzing data quality</span>
+                        </div>
+                        <div class="step" id="step4">
+                            <i class="fas fa-circle"></i>
+                            <span>Generating visualizations</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <!-- File Overview -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle"></i>
+                        <h3>File Overview</h3>
+                    </div>
+                    <div class="overview-grid" id="fileOverview">
+                        <!-- Dynamic content will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Schema Information -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-sitemap"></i>
+                        <h3>Schema Information</h3>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" onclick="switchTab('tables')">Tables</button>
+                            <button class="tab-btn" onclick="switchTab('columns')">Columns</button>
+                        </div>
+                        <div class="tab-content">
+                            <div id="tablesContent" class="tab-pane active">
+                                <div class="tables-grid" id="tablesGrid">
+                                    <!-- Tables will be inserted here -->
+                                </div>
+                            </div>
+                            <div id="columnsContent" class="tab-pane">
+                                <div class="columns-table-container">
+                                    <div id="columnsTable">
+                                        <!-- Columns table will be inserted here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Quality -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-shield-alt"></i>
+                        <h3>Data Quality Metrics</h3>
+                    </div>
+                    <div class="quality-grid" id="qualityMetrics">
+                        <!-- Quality metrics will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Visualizations -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-bar"></i>
+                        <h3>Data Visualizations</h3>
+                    </div>
+                    <div class="visualization-grid" id="visualizations">
+                        <!-- Visualizations will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Metadata Export -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-download"></i>
+                        <h3>Export Metadata</h3>
+                    </div>
+                    <div class="export-options">
+                        <button class="export-btn" onclick="exportMetadata('json')">
+                            <i class="fas fa-file-code"></i> Export as JSON
+                        </button>
+                        <button class="export-btn" onclick="exportMetadata('csv')">
+                            <i class="fas fa-file-csv"></i> Export as CSV
+                        </button>
+                        <button class="export-btn" onclick="exportMetadata('pdf')">
+                            <i class="fas fa-file-pdf"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2025 Excel SourceSense - Built with Atlan Apps Framework</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Processing your Excel file...</p>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal" id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Error</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="errorMessage">
+                <!-- Error message will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
