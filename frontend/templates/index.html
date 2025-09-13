@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -127,6 +128,28 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Business Context Section (NEW) -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-business-time"></i>
+                        <h3>Business Context</h3>
+                    </div>
+                    <div id="businessContext">
+                        <!-- Business context editing will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Data Lineage Section (NEW) -->
+                <div class="result-card">
+                    <div class="card-header">
+                        <i class="fas fa-project-diagram"></i>
+                        <h3>Data Lineage & Relationships</h3>
+                    </div>
+                    <div id="lineageViz">
+                        <!-- Lineage visualization will be inserted here -->
                     </div>
                 </div>
 

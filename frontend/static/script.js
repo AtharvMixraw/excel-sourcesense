@@ -239,10 +239,392 @@ function showResults() {
         // Populate all sections
         displayFileOverview();
         displaySchemaInformation();
+        displayBusinessContext();  // NEW
+        displayLineage();          // NEW
         displayDataQuality();
         displayVisualizations();
         
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+// NEW: Business context editing
+function displayBusinessContext() {
+    const container = document.getElementById('businessContext');
+    if (!container) return;
+    
+    // Use columns_info if available, fallback to schema_info
+    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
+    
+    if (columns.length === 0) {
+        container.innerHTML = '<p>No column information available for business context.</p>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="business-context-intro">
+            <p>Add business descriptions and tags to enhance metadata value:</p>
+        </div>
+        <div class="context-grid">
+            ${columns.map((col, index) => `
+                <div class="context-row">
+                    <div class="column-info">
+                        <strong>${col.column_name}</strong>
+                        <span class="table-name">(${col.table_name})</span>
+                        <span class="data-type">${col.data_type}</span>
+                    </div>
+                    <div class="context-inputs">
+                        <div class="input-group">
+                            <label>Description:</label>
+                            <input type="text" 
+                                   data-col="${col.column_name}" 
+                                   data-table="${col.table_name}"
+                                   class="desc-input" 
+                                   value="${col.description || ''}"
+                                   placeholder="Add business description...">
+                        </div>
+                        <div class="input-group">
+                            <label>Tags:</label>
+                            <input type="text" 
+                                   data-col="${col.column_name}" 
+                                   data-table="${col.table_name}"
+                                   class="tags-input" 
+                                   value="${col.tags ? (Array.isArray(col.tags) ? col.tags.join(', ') : col.tags) : ''}"
+                                   placeholder="PII, Critical, Customer Data...">
+                        </div>
+                        <div class="input-group">
+                            <label>Business Owner:</label>
+                            <input type="text" 
+                                   data-col="${col.column_name}" 
+                                   data-table="${col.table_name}"
+                                   class="owner-input" 
+                                   value="${col.owner || ''}"
+                                   placeholder="Team or person responsible...">
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        <div class="context-actions">
+            <button class="save-context-btn" onclick="saveBusinessContext()">
+                <i class="fas fa-save"></i> Save Business Context
+            </button>
+            <button class="reset-context-btn" onclick="resetBusinessContext()">
+                <i class="fas fa-undo"></i> Reset
+            </button>
+        </div>
+    `;
+}
+
+function saveBusinessContext() {
+    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
+    
+    // Update metadata with business context
+    document.querySelectorAll('.desc-input').forEach(input => {
+        const colName = input.dataset.col;
+        const tableName = input.dataset.table;
+        const col = columns.find(c => c.column_name === colName && c.table_name === tableName);
+        if (col) {
+            col.description = input.value.trim();
+        }
+    });
+    
+    document.querySelectorAll('.tags-input').forEach(input => {
+        const colName = input.dataset.col;
+        const tableName = input.dataset.table;
+        const col = columns.find(c => c.column_name === colName && c.table_name === tableName);
+        if (col) {
+            col.tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
+        }
+    });
+    
+    document.querySelectorAll('.owner-input').forEach(input => {
+        const colName = input.dataset.col;
+        const tableName = input.dataset.table;
+        const col = columns.find(c => c.column_name === colName && c.table_name === tableName);
+        if (col) {
+            col.owner = input.value.trim();
+        }
+    });
+    
+    // Show success message
+    showSuccessMessage('Business context saved successfully!');
+    
+    // Refresh displays
+    displayColumns();
+}
+
+function resetBusinessContext() {
+    if (confirm('Are you sure you want to reset all business context changes?')) {
+        displayBusinessContext();
+    }
+}
+
+// NEW: Simple lineage detection and visualization
+function detectRelationships() {
+    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
+    if (columns.length === 0) return [];
+    
+    let relationships = [];
+    
+    // Method 1: Exact column name matches across different tables
+    columns.forEach((colA, idxA) => {
+        columns.forEach((colB, idxB) => {
+            if (idxA !== idxB && 
+                colA.column_name.toLowerCase() === colB.column_name.toLowerCase() && 
+                colA.table_name !== colB.table_name) {
+                relationships.push({
+                    from: `${colA.table_name}.${colA.column_name}`,
+                    to: `${colB.table_name}.${colB.column_name}`,
+                    type: 'exact_match',
+                    strength: 'high'
+                });
+            }
+        });
+    });
+    
+    // Method 2: Similar column names (fuzzy matching)
+    columns.forEach((colA, idxA) => {
+        columns.forEach((colB, idxB) => {
+            if (idxA !== idxB && colA.table_name !== colB.table_name) {
+                const similarity = calculateStringSimilarity(
+                    colA.column_name.toLowerCase(), 
+                    colB.column_name.toLowerCase()
+                );
+                
+                if (similarity > 0.7 && similarity < 1.0) { // Similar but not identical
+                    relationships.push({
+                        from: `${colA.table_name}.${colA.column_name}`,
+                        to: `${colB.table_name}.${colB.column_name}`,
+                        type: 'similar_name',
+                        strength: 'medium',
+                        similarity: similarity
+                    });
+                }
+            }
+        });
+    });
+    
+    // Method 3: Foreign key pattern detection (ID fields)
+    const idPattern = /^.*_?id$/i;
+    const foreignKeyPatterns = [];
+    
+    columns.forEach(col => {
+        if (idPattern.test(col.column_name)) {
+            foreignKeyPatterns.push(col);
+        }
+    });
+    
+    // Remove duplicates and sort by strength
+    const uniqueRelationships = relationships.filter((rel, index, self) => 
+        index === self.findIndex(r => r.from === rel.from && r.to === rel.to)
+    );
+    
+    return uniqueRelationships.sort((a, b) => {
+        const strengthOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+        return strengthOrder[b.strength] - strengthOrder[a.strength];
+    });
+}
+
+function calculateStringSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+}
+
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
+}
+
+function displayLineage() {
+    const container = document.getElementById('lineageViz');
+    if (!container) return;
+    
+    const relationships = detectRelationships();
+    
+    if (relationships.length === 0) {
+        container.innerHTML = `
+            <div class="lineage-empty">
+                <i class="fas fa-project-diagram" style="font-size: 2rem; color: #6c757d; margin-bottom: 10px;"></i>
+                <p>No column relationships detected.</p>
+                <p><small>Relationships are detected based on column name similarities across tables.</small></p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="lineage-header">
+            <p>Found ${relationships.length} potential relationship(s) between columns:</p>
+        </div>
+        <div class="relationships-list">
+            ${relationships.map(rel => `
+                <div class="relationship-item ${rel.strength}">
+                    <div class="relationship-info">
+                        <span class="from">${rel.from}</span>
+                        <i class="fas fa-arrow-right"></i>
+                        <span class="to">${rel.to}</span>
+                    </div>
+                    <div class="relationship-meta">
+                        <span class="type">${rel.type.replace('_', ' ')}</span>
+                        <span class="strength ${rel.strength}">${rel.strength}</span>
+                        ${rel.similarity ? `<span class="similarity">${Math.round(rel.similarity * 100)}% similar</span>` : ''}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        <div class="lineage-visualization">
+            <h4>Visual Representation</h4>
+            <svg id="lineageGraph" width="100%" height="400"></svg>
+        </div>
+    `;
+    
+    // Load D3.js and render graph
+    loadD3AndRenderLineage(relationships);
+}
+
+function loadD3AndRenderLineage(relationships) {
+    if (typeof d3 === "undefined") {
+        const script = document.createElement('script');
+        script.src = 'https://d3js.org/d3.v7.min.js';
+        script.onload = () => renderLineageGraph(relationships);
+        document.head.appendChild(script);
+    } else {
+        renderLineageGraph(relationships);
+    }
+}
+
+function renderLineageGraph(edges) {
+    // Prepare nodes and links
+    let nodeMap = {};
+    let links = [];
+    
+    edges.forEach((rel) => {
+        nodeMap[rel.from] = { id: rel.from, group: rel.from.split('.')[0] };
+        nodeMap[rel.to] = { id: rel.to, group: rel.to.split('.')[0] };
+        links.push({
+            source: rel.from,
+            target: rel.to,
+            strength: rel.strength,
+            type: rel.type
+        });
+    });
+    
+    const nodes = Object.values(nodeMap);
+    
+    // Set up SVG
+    const svg = d3.select("#lineageGraph");
+    const container = svg.node().parentNode;
+    const width = container.clientWidth;
+    const height = 400;
+    
+    svg.attr("width", width).attr("height", height);
+    svg.selectAll("*").remove();
+    
+    // Create simulation
+    const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(30));
+    
+    // Create links
+    const link = svg.append("g")
+        .selectAll("line")
+        .data(links)
+        .enter()
+        .append("line")
+        .attr("stroke", d => d.strength === 'high' ? '#28a745' : d.strength === 'medium' ? '#ffc107' : '#dc3545')
+        .attr("stroke-width", d => d.strength === 'high' ? 3 : 2)
+        .attr("stroke-dasharray", d => d.type === 'similar_name' ? "5,5" : "none");
+    
+    // Create nodes
+    const node = svg.append("g")
+        .selectAll("circle")
+        .data(nodes)
+        .enter()
+        .append("circle")
+        .attr("r", 8)
+        .attr("fill", d => {
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00c9ff'];
+            return colors[d.group.length % colors.length];
+        })
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+    
+    // Add labels
+    const labels = svg.append("g")
+        .selectAll("text")
+        .data(nodes)
+        .enter()
+        .append("text")
+        .text(d => d.id)
+        .attr("font-size", "10px")
+        .attr("text-anchor", "middle")
+        .attr("dy", -12);
+    
+    // Update positions on tick
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+        
+        node
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
+        
+        labels
+            .attr("x", d => d.x)
+            .attr("y", d => d.y);
+    });
+    
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+    
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+    
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
     }
 }
 
@@ -336,6 +718,9 @@ function displayColumns() {
                     <th>Table</th>
                     <th>Column Name</th>
                     <th>Data Type</th>
+                    <th>Description</th>
+                    <th>Tags</th>
+                    <th>Owner</th>
                     <th>Nullable</th>
                     <th>Unique %</th>
                     <th>Null %</th>
@@ -348,6 +733,9 @@ function displayColumns() {
                         <td>${col.table_name}</td>
                         <td>${col.column_name}</td>
                         <td><span class="data-type-${col.data_type.toLowerCase()}">${col.data_type}</span></td>
+                        <td><span class="description">${col.description || '-'}</span></td>
+                        <td><span class="tags">${col.tags ? (Array.isArray(col.tags) ? col.tags.join(', ') : col.tags) : '-'}</span></td>
+                        <td><span class="owner">${col.owner || '-'}</span></td>
                         <td>${col.is_nullable}</td>
                         <td>${col.unique_percentage || 0}%</td>
                         <td>${col.null_percentage || 0}%</td>
@@ -689,6 +1077,35 @@ function showError(message) {
     } else {
         alert(message); // Fallback
     }
+}
+
+function showSuccessMessage(message) {
+    const notification = document.createElement('div');
+    notification.className = 'success-notification';
+    notification.innerHTML = `
+        <i class="fas fa-check-circle"></i>
+        <span>${message}</span>
+    `;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
 }
 
 function closeModal() {
