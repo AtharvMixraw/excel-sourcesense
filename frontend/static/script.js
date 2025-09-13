@@ -464,16 +464,22 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
+// Simplified lineage functions - replace the existing ones
+
 function displayLineage() {
     const container = document.getElementById('lineageViz');
-    if (!container) return;
+    if (!container) {
+        console.log('Lineage container not found');
+        return;
+    }
     
     const relationships = detectRelationships();
+    console.log('Detected relationships:', relationships);
     
     if (relationships.length === 0) {
         container.innerHTML = `
             <div class="lineage-empty">
-                <i class="fas fa-project-diagram" style="font-size: 2rem; color: #6c757d; margin-bottom: 10px;"></i>
+                <i class="fas fa-project-diagram"></i>
                 <p>No column relationships detected.</p>
                 <p><small>Relationships are detected based on column name similarities across tables.</small></p>
             </div>
@@ -503,128 +509,256 @@ function displayLineage() {
         </div>
         <div class="lineage-visualization">
             <h4>Visual Representation</h4>
-            <svg id="lineageGraph" width="100%" height="400"></svg>
+            <div class="lineage-graph-container">
+                <svg id="lineageGraph"></svg>
+            </div>
         </div>
     `;
     
-    // Load D3.js and render graph
-    loadD3AndRenderLineage(relationships);
+    // Try to load D3 and render graph
+    setTimeout(() => {
+        loadD3AndRenderLineage(relationships);
+    }, 100);
 }
 
 function loadD3AndRenderLineage(relationships) {
+    // Check if D3 is available
     if (typeof d3 === "undefined") {
+        console.log('D3 not available, loading from CDN...');
         const script = document.createElement('script');
-        script.src = 'https://d3js.org/d3.v7.min.js';
-        script.onload = () => renderLineageGraph(relationships);
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js';
+        script.onload = () => {
+            console.log('D3 loaded, rendering graph...');
+            renderLineageGraph(relationships);
+        };
+        script.onerror = () => {
+            console.error('Failed to load D3, showing fallback...');
+            showLineageFallback(relationships);
+        };
         document.head.appendChild(script);
     } else {
+        console.log('D3 available, rendering graph...');
         renderLineageGraph(relationships);
     }
 }
 
 function renderLineageGraph(edges) {
-    // Prepare nodes and links
-    let nodeMap = {};
-    let links = [];
-    
-    edges.forEach((rel) => {
-        nodeMap[rel.from] = { id: rel.from, group: rel.from.split('.')[0] };
-        nodeMap[rel.to] = { id: rel.to, group: rel.to.split('.')[0] };
-        links.push({
-            source: rel.from,
-            target: rel.to,
-            strength: rel.strength,
-            type: rel.type
+    try {
+        console.log('Rendering lineage graph with', edges.length, 'edges');
+        
+        // Prepare nodes and links
+        let nodeMap = {};
+        let links = [];
+        
+        edges.forEach((rel) => {
+            const fromTable = rel.from.split('.')[0];
+            const toTable = rel.to.split('.')[0];
+            
+            nodeMap[rel.from] = { 
+                id: rel.from, 
+                group: fromTable,
+                table: fromTable,
+                column: rel.from.split('.')[1]
+            };
+            nodeMap[rel.to] = { 
+                id: rel.to, 
+                group: toTable,
+                table: toTable,
+                column: rel.to.split('.')[1]
+            };
+            
+            links.push({
+                source: rel.from,
+                target: rel.to,
+                strength: rel.strength,
+                type: rel.type
+            });
         });
-    });
-    
-    const nodes = Object.values(nodeMap);
-    
-    // Set up SVG
-    const svg = d3.select("#lineageGraph");
-    const container = svg.node().parentNode;
-    const width = container.clientWidth;
-    const height = 400;
-    
-    svg.attr("width", width).attr("height", height);
-    svg.selectAll("*").remove();
-    
-    // Create simulation
-    const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-        .force("charge", d3.forceManyBody().strength(-300))
-        .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(30));
-    
-    // Create links
-    const link = svg.append("g")
-        .selectAll("line")
-        .data(links)
-        .enter()
-        .append("line")
-        .attr("stroke", d => d.strength === 'high' ? '#28a745' : d.strength === 'medium' ? '#ffc107' : '#dc3545')
-        .attr("stroke-width", d => d.strength === 'high' ? 3 : 2)
-        .attr("stroke-dasharray", d => d.type === 'similar_name' ? "5,5" : "none");
-    
-    // Create nodes
-    const node = svg.append("g")
-        .selectAll("circle")
-        .data(nodes)
-        .enter()
-        .append("circle")
-        .attr("r", 8)
-        .attr("fill", d => {
-            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00c9ff'];
-            return colors[d.group.length % colors.length];
-        })
-        .call(d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended));
-    
-    // Add labels
-    const labels = svg.append("g")
-        .selectAll("text")
-        .data(nodes)
-        .enter()
-        .append("text")
-        .text(d => d.id)
-        .attr("font-size", "10px")
-        .attr("text-anchor", "middle")
-        .attr("dy", -12);
-    
-    // Update positions on tick
-    simulation.on("tick", () => {
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
         
-        node
-            .attr("cx", d => d.x)
-            .attr("cy", d => d.y);
+        const nodes = Object.values(nodeMap);
+        console.log('Nodes:', nodes.length, 'Links:', links.length);
         
-        labels
-            .attr("x", d => d.x)
-            .attr("y", d => d.y);
-    });
-    
-    function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+        // Get container dimensions
+        const container = document.querySelector('.lineage-graph-container');
+        if (!container) {
+            console.error('Graph container not found');
+            return;
+        }
+        
+        const containerRect = container.getBoundingClientRect();
+        const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+        const width = Math.max(400, containerRect.width - margin.left - margin.right);
+        const height = 400;
+        
+        console.log('Container dimensions:', width, 'x', height);
+        
+        // Set up SVG
+        const svg = d3.select("#lineageGraph")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .style("max-width", "100%")
+            .style("height", "auto");
+        
+        // Clear any existing content
+        svg.selectAll("*").remove();
+        
+        // Create main group
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left}, ${margin.top})`);
+        
+        // Create simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(100).strength(0.8))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(40))
+            .force("x", d3.forceX(width / 2).strength(0.1))
+            .force("y", d3.forceY(height / 2).strength(0.1));
+        
+        // Create links
+        const link = g.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(links)
+            .enter()
+            .append("line")
+            .attr("stroke", d => {
+                switch(d.strength) {
+                    case 'high': return '#48bb78';
+                    case 'medium': return '#ed8936';
+                    case 'low': return '#f56565';
+                    default: return '#718096';
+                }
+            })
+            .attr("stroke-width", d => d.strength === 'high' ? 3 : 2)
+            .attr("stroke-dasharray", d => d.type === 'similar_name' ? "5,5" : "none")
+            .attr("opacity", 0.7);
+        
+        // Create node groups
+        const nodeGroup = g.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(nodes)
+            .enter()
+            .append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+        
+        // Add circles to nodes
+        nodeGroup.append("circle")
+            .attr("r", 12)
+            .attr("fill", d => {
+                // Generate color based on table name
+                const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00c9ff'];
+                const hash = d.table.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+                return colors[Math.abs(hash) % colors.length];
+            })
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 2);
+        
+        // Add labels
+        nodeGroup.append("text")
+            .text(d => d.column || d.id.split('.')[1] || d.id)
+            .attr("font-size", "10px")
+            .attr("font-family", "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif")
+            .attr("text-anchor", "middle")
+            .attr("dy", -18)
+            .attr("fill", "#2d3748")
+            .attr("font-weight", "500");
+        
+        // Add tooltips
+        nodeGroup.append("title")
+            .text(d => d.id);
+        
+        // Update positions on simulation tick
+        simulation.on("tick", () => {
+            // Keep nodes within bounds
+            nodes.forEach(d => {
+                d.x = Math.max(25, Math.min(width - 25, d.x));
+                d.y = Math.max(25, Math.min(height - 25, d.y));
+            });
+            
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            
+            nodeGroup
+                .attr("transform", d => `translate(${d.x}, ${d.y})`);
+        });
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = Math.max(25, Math.min(width - 25, event.x));
+            d.fy = Math.max(25, Math.min(height - 25, event.y));
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Add zoom functionality
+        const zoom = d3.zoom()
+            .scaleExtent([0.5, 2])
+            .on("zoom", (event) => {
+                g.attr("transform", 
+                    `translate(${margin.left + event.transform.x}, ${margin.top + event.transform.y}) scale(${event.transform.k})`
+                );
+            });
+        
+        svg.call(zoom);
+        
+        // Add reset button
+        const existingButton = container.querySelector('.reset-zoom-btn');
+        if (existingButton) {
+            existingButton.remove();
+        }
+        
+        const resetButton = document.createElement('button');
+        resetButton.innerHTML = '<i class="fas fa-expand-arrows-alt"></i> Reset View';
+        resetButton.className = 'reset-zoom-btn';
+        resetButton.onclick = () => {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(0, 0).scale(1)
+            );
+        };
+        container.appendChild(resetButton);
+        
+        console.log('Lineage graph rendered successfully');
+        
+    } catch (error) {
+        console.error('Error rendering lineage graph:', error);
+        showLineageFallback(edges);
     }
-    
-    function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
-    }
-    
-    function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+}
+
+function showLineageFallback(relationships) {
+    const container = document.querySelector('.lineage-graph-container');
+    if (container) {
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 20px;">
+                <i class="fas fa-project-diagram" style="font-size: 3rem; color: #718096; margin-bottom: 20px;"></i>
+                <h4 style="color: #2d3748; margin-bottom: 10px;">Interactive Visualization Unavailable</h4>
+                <p style="color: #718096; margin: 0;">The relationship list above shows all detected connections.</p>
+            </div>
+        `;
     }
 }
 

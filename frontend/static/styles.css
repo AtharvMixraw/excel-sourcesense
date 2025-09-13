@@ -867,122 +867,7 @@ body {
     background: #4a5568;
 }
 
-/* Lineage Visualization Styles */
-.lineage-empty {
-    text-align: center;
-    padding: 32px;
-    color: #718096;
-}
 
-.lineage-header {
-    margin-bottom: 20px;
-    padding: 16px;
-    background: #f7fafc;
-    border-radius: 6px;
-    border-left: 4px solid #48bb78;
-}
-
-.relationships-list {
-    margin-bottom: 24px;
-}
-
-.relationship-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px;
-    margin-bottom: 8px;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    background: white;
-}
-
-.relationship-item.high {
-    border-left: 4px solid #48bb78;
-}
-
-.relationship-item.medium {
-    border-left: 4px solid #ed8936;
-}
-
-.relationship-item.low {
-    border-left: 4px solid #f56565;
-}
-
-.relationship-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-    font-size: 14px;
-}
-
-.relationship-info .from, .relationship-info .to {
-    background: #edf2f7;
-    padding: 4px 8px;
-    border-radius: 4px;
-    color: #4a5568;
-}
-
-.relationship-meta {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.relationship-meta .type {
-    background: #718096;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 12px;
-    text-transform: capitalize;
-}
-
-.relationship-meta .strength {
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.relationship-meta .strength.high {
-    background: #c6f6d5;
-    color: #22543d;
-}
-
-.relationship-meta .strength.medium {
-    background: #feebc8;
-    color: #744210;
-}
-
-.relationship-meta .strength.low {
-    background: #fed7d7;
-    color: #742a2a;
-}
-
-.similarity {
-    font-size: 11px;
-    color: #718096;
-}
-
-.lineage-visualization {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid #e2e8f0;
-}
-
-.lineage-visualization h4 {
-    margin-bottom: 16px;
-    color: #2d3748;
-    font-weight: 600;
-}
-
-#lineageGraph {
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    background: #f7fafc;
-}
 
 /* Enhanced Column Table Styles */
 .columns-table-container table {
@@ -1033,3 +918,256 @@ body {
         opacity: 1;
     }
 }
+/* ===== REPLACE ALL LINEAGE-RELATED CSS WITH THIS ===== */
+
+/* Lineage Visualization Container */
+.lineage-visualization {
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+.lineage-graph-container {
+    position: relative;
+    width: 100%;
+    height: 450px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f7fafc;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+#lineageGraph {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Lineage Empty State */
+.lineage-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #718096;
+}
+
+.lineage-empty i {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 2rem;
+}
+
+/* Lineage Header */
+.lineage-header {
+    margin-bottom: 15px;
+    padding: 16px;
+    background: #f7fafc;
+    border-radius: 6px;
+    border-left: 4px solid #48bb78;
+}
+
+.lineage-header p {
+    margin: 0;
+    color: #2d3748;
+    font-weight: 500;
+}
+
+/* Relationships List */
+.relationships-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.relationship-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.relationship-item:last-child {
+    border-bottom: none;
+}
+
+.relationship-item:hover {
+    background-color: #f7fafc;
+}
+
+.relationship-item.high {
+    border-left: 4px solid #48bb78;
+}
+
+.relationship-item.medium {
+    border-left: 4px solid #ed8936;
+}
+
+.relationship-item.low {
+    border-left: 4px solid #f56565;
+}
+
+.relationship-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.relationship-info .from,
+.relationship-info .to {
+    font-family: ui-monospace, SFMono-Regular, 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    padding: 4px 8px;
+    background: #edf2f7;
+    border-radius: 4px;
+    color: #4a5568;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.relationship-info i {
+    color: #718096;
+    flex-shrink: 0;
+}
+
+.relationship-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.relationship-meta .type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #718096;
+    background: #edf2f7;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.relationship-meta .strength {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: white;
+}
+
+.relationship-meta .strength.high {
+    background: #48bb78;
+}
+
+.relationship-meta .strength.medium {
+    background: #ed8936;
+}
+
+.relationship-meta .strength.low {
+    background: #f56565;
+}
+
+.relationship-meta .similarity {
+    font-size: 11px;
+    color: #718096;
+    background: #edf2f7;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* Reset zoom button */
+.reset-zoom-btn {
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    padding: 6px 12px !important;
+    background: #fff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 12px !important;
+    z-index: 10 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    transition: all 0.2s ease !important;
+    color: #4a5568 !important;
+    font-weight: 500 !important;
+}
+
+.reset-zoom-btn:hover {
+    background: #f7fafc !important;
+    border-color: #cbd5e0 !important;
+}
+
+.reset-zoom-btn i {
+    margin-right: 4px;
+}
+
+/* SVG Styling */
+.lineage-graph-container .links line {
+    stroke-opacity: 0.7;
+}
+
+.lineage-graph-container .nodes circle {
+    cursor: move;
+    transition: stroke-width 0.2s;
+}
+
+.lineage-graph-container .nodes circle:hover {
+    stroke-width: 3px;
+}
+
+.lineage-graph-container .nodes text {
+    pointer-events: none;
+    user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .lineage-graph-container {
+        height: 350px;
+    }
+    
+    .relationship-info .from,
+    .relationship-info .to {
+        max-width: 120px;
+        font-size: 12px;
+    }
+    
+    .relationship-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .relationship-meta {
+        align-self: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .lineage-graph-container {
+        height: 300px;
+    }
+    
+    .relationships-list {
+        max-height: 200px;
+    }
+    
+    .relationship-info .from,
+    .relationship-info .to {
+        max-width: 100px;
+        font-size: 11px;
+    }
+} 
