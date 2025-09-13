@@ -66,8 +66,17 @@ Built using Atlan Apps Framework with:
 5. **Export**: JSON/CSV export functionality
 
 ## Testing
+You can generate fresh sample Excel and CSV files for testing:
 
-Sample files are automatically generated:
+```
+uv run poe create-sample-data
+```
+This will create files under the sample_data/ directory:
+
+- company_data.xlsx → Contains multiple sheets (Employees, Sales)
+- sales_data.csv → Standalone CSV version of the sales dataset
+
+Additionally, the repository includes pre-defined test files:-
 - `company_employees.xlsx`: Multi-sheet workbook
 - `sales_analytics.xlsx`: Large dataset
 - `customer_survey.xlsx`: Data quality issues
