@@ -98,7 +98,6 @@ excel-sourcesense/
 │   └── static/             # CSS, JS, assets
 ├── deploy/                 # Installation and deployment files
 ├── local/                  # Local data storage
-├── models/                 # Data models and schemas
 ├── uploads/                # File upload directory
 ├── sample_data/            # Sample Excel files
 ├── main.py                 # Application entry point
