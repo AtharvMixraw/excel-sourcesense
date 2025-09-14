@@ -56,7 +56,6 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
     @activity.defn
     async def get_workflow_args(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
         """Get workflow arguments from config."""
-        # Add current timestamp here (allowed in activities)
         from datetime import datetime
 
         workflow_args = workflow_config.copy()

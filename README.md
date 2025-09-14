@@ -41,7 +41,7 @@ Built using Atlan Apps Framework with:
    uv run poe download-components
    ```
 
-2. **Set up environment variables (see .env.example)**
+2. **Set up environment variables (see .env in the doc)**
 
 3. **Start dependencies (in separate terminal):**
    ```bash
@@ -76,7 +76,7 @@ This will create files under the sample_data/ directory:
 - company_data.xlsx → Contains multiple sheets (Employees, Sales)
 - sales_data.csv → Standalone CSV version of the sales dataset
 
-Additionally, the repository includes pre-defined test files:-
+Additionally, the repository includes pre-defined test files (uploads folder):-
 - `company_employees.xlsx`: Multi-sheet workbook
 - `sales_analytics.xlsx`: Large dataset
 - `customer_survey.xlsx`: Data quality issues
@@ -87,7 +87,6 @@ Additionally, the repository includes pre-defined test files:-
 ```
 excel-sourcesense/
 ├── app/                    # Core application logic
-│   ├── sql/                # SQL query templates (if needed)
 │   ├── activities.py       # Metadata extraction activities
 │   ├── clients.py          # Excel file client
 │   ├── handlers.py         # HTTP request handlers
@@ -123,12 +122,7 @@ excel-sourcesense/
 uv run poe stop-deps
 ```
 
-### Run Tests
-```bash
-uv run pytest
-```
-
-> **Note**: Make sure you have a `.env` file that matches the [.env.example](.env.example) file in this directory.
+> **Note**: Make sure you have a `.env` file (ATTACHED IN THE SUBMISSION DOC)
 
 ## Learning Resources
 
@@ -136,13 +130,6 @@ uv run pytest
 - [Excel Processing with Pandas Documentation](https://pandas.pydata.org/docs/user_guide/io.html#excel-files)
 - [Python FastAPI Documentation](https://fastapi.tiangolo.com/)
 
-## Contributing
-
-We welcome contributions! Please feel free to submit a Pull Request.
-
-## Demo Video
-
-[Link to 5-7 minute demo video showcasing features]
 
 ## License
 

@@ -90,10 +90,10 @@ class ExcelMetadataHandler:
                     "workflow_id": workflow_id
                 }
                 
-                # CORRECT: Use the class.run method reference, not string!
+              
                 handle = await client.start_workflow(
-                    ExcelMetadataExtractionWorkflow.run,  # Use CLASS.RUN METHOD!
-                    {"file_path": file_path},  # Single argument
+                    ExcelMetadataExtractionWorkflow.run, 
+                    {"file_path": file_path}, 
                     id=workflow_id,
                     task_queue="excel-extraction-queue",
                 )

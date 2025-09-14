@@ -1261,7 +1261,7 @@ function switchTab(tabName) {
     }
 }
 
-// Export metadata function - ENHANCED
+// Export metadata function
 async function exportMetadata(format) {
     try {
         if (!extractedMetadata || Object.keys(extractedMetadata).length === 0) {
