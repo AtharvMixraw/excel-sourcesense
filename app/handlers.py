@@ -2,10 +2,15 @@
 Handler for Excel metadata extraction requests.
 Uses correct Atlan SDK imports and patterns.
 """
+from pathlib import Path  
+from datetime import datetime 
 from typing import Dict, Any, Optional
 from fastapi import UploadFile, HTTPException
 from pathlib import Path
 import asyncio
+import time
+from datetime import datetime
+import uuid
 from application_sdk.observability.decorators.observability_decorator import (
     observability,
 )
@@ -35,6 +40,75 @@ class ExcelMetadataHandler:
         
         # Storage for results (in production, this would use a database)
         self._workflow_results = {}
+        
+        # Optional Temporal client (None if not available)
+        self.temporal_client = None
+        self._setup_temporal_client()
+    
+    def _setup_temporal_client(self):
+        """Setup Temporal client if available (optional)."""
+        try:
+            # Try to import and connect only if temporalio is available
+            import temporalio
+            from temporalio.client import Client
+            
+            # This will be set up later if needed
+            self._temporal_available = True
+            logger.info("Temporal SDK available for dashboard integration")
+        except ImportError:
+            self._temporal_available = False
+            logger.info("Temporal SDK not available - using fallback dashboard links")
+    
+    async def _get_temporal_client(self):
+        """Get or create Temporal client connection."""
+        if not self._temporal_available:
+            return None
+            
+        if self.temporal_client is None:
+            try:
+                from temporalio.client import Client
+                # Try to connect to local dev server
+                self.temporal_client = await Client.connect("localhost:7233")
+                logger.info("Connected to Temporal server for dashboard integration")
+            except Exception as e:
+                logger.warning(f"Could not connect to Temporal server: {e}")
+                self.temporal_client = False  # Mark as failed
+        
+        return self.temporal_client if self.temporal_client is not False else None
+
+    async def _start_temporal_workflow(self, workflow_id: str, file_path: str) -> Dict[str, Any]:
+        """Start Temporal workflow if server is available."""
+        client = await self._get_temporal_client()
+        
+        if client:
+            try:
+                from app.workflows import ExcelMetadataExtractionWorkflow
+                workflow_config = {
+                    "file_path": file_path,
+                    "filename": Path(file_path).name,  # Extract filename from path
+                    "upload_timestamp": datetime.now().isoformat(),
+                    "workflow_id": workflow_id
+                }
+                
+                # CORRECT: Use the class.run method reference, not string!
+                handle = await client.start_workflow(
+                    ExcelMetadataExtractionWorkflow.run,  # Use CLASS.RUN METHOD!
+                    {"file_path": file_path},  # Single argument
+                    id=workflow_id,
+                    task_queue="excel-extraction-queue",
+                )
+                
+                return {
+                    "temporal_status": "started",
+                    "run_id": handle.result_run_id
+                }
+            except Exception as e:
+                logger.warning(f"Could not start Temporal workflow: {e}")
+        
+        return {
+            "temporal_status": "simulation",
+            "run_id": f"sim_{workflow_id}"
+        }
     
     @observability(logger=logger, metrics=metrics, traces=traces)
     async def handle_file_upload(self, file: UploadFile) -> Dict[str, Any]:
@@ -61,15 +135,26 @@ class ExcelMetadataHandler:
             
             logger.info(f"File uploaded successfully: {file_path}")
             
-            # Process the file
+            # Generate workflow ID to MATCH completed pattern
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            workflow_id = f"excel_sourcesense_{file.filename}_{timestamp}_{unique_id}"
+            
+            # Try to start Temporal workflow if available
+            temporal_info = await self._start_temporal_workflow(workflow_id, str(file_path))
+            
+            # Process the file (existing logic)
             result = await self.process_excel_file(str(file_path), file.filename)
             
             return {
                 "success": True,
                 "filename": file.filename,
                 "file_path": str(file_path),
-                "workflow_id": f"excel_{file.filename}_{hash(str(file_path)) % 10000}",
-                "result": result
+                "workflow_id": workflow_id,
+                "temporal_dashboard_url": f"http://localhost:8233/namespaces/default/workflows/{workflow_id}",
+                "temporal_available": self._temporal_available,
+                "result": result,
+                **temporal_info  # Add any temporal-specific info
             }
             
         except HTTPException:
@@ -87,6 +172,14 @@ class ExcelMetadataHandler:
                 # Create sample file if it doesn't exist
                 await self.create_sample_file(filename)
             
+            # Generate workflow ID to MATCH completed pattern
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            workflow_id = f"excel_sourcesense_{filename}_{timestamp}_{unique_id}"
+            
+            # Try to start Temporal workflow if available
+            temporal_info = await self._start_temporal_workflow(workflow_id, str(sample_file))
+            
             # Process the sample file
             result = await self.process_excel_file(str(sample_file), filename)
             
@@ -94,8 +187,11 @@ class ExcelMetadataHandler:
                 "success": True,
                 "filename": filename,
                 "file_path": str(sample_file),
-                "workflow_id": f"sample_{filename}_{hash(str(sample_file)) % 10000}",
-                "result": result
+                "workflow_id": workflow_id,
+                "temporal_dashboard_url": f"http://localhost:8233/namespaces/default/workflows/{workflow_id}",
+                "temporal_available": self._temporal_available,
+                "result": result,
+                **temporal_info
             }
             
         except Exception as e:

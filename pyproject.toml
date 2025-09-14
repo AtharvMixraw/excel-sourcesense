@@ -25,6 +25,7 @@ dependencies = [
     "python-dateutil>=2.8.0",
     "chardet>=5.0.0",  # For encoding detection
     "pathvalidate>=3.0.0",  # For file path validation
+    "temporalio>=1.5.0",
 ]
 
 [dependency-groups]

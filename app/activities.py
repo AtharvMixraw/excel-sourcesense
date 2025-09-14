@@ -2,6 +2,7 @@
 This file contains the activities for the Excel metadata extraction application.
 Handles Excel file analysis and metadata extraction.
 """
+
 from typing import Any, Dict, Optional, List
 import pandas as pd
 import numpy as np
@@ -46,43 +47,53 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
         elif pd.isna(obj) or obj is None or obj == np.nan:
             return None
         elif hasattr(obj, 'dtype'):
-            # Handle pandas/numpy dtypes
             return str(obj)
         else:
             return obj
+
+    @observability(logger=logger, metrics=metrics, traces=traces)
     
+    @activity.defn
+    async def get_workflow_args(self, workflow_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Get workflow arguments from config."""
+        # Add current timestamp here (allowed in activities)
+        from datetime import datetime
+
+        workflow_args = workflow_config.copy()
+        workflow_args['processing_start_time'] = datetime.now().isoformat()
+
+        return workflow_args
+
+
+    @observability(logger=logger, metrics=metrics, traces=traces)
+    @activity.defn
+    async def preflight_check(self, workflow_args: Dict[str, Any]) -> bool:
+        """Perform preflight checks."""
+        file_path = workflow_args.get('file_path')
+        if not file_path or not Path(file_path).exists():
+            raise Exception(f"File not found: {file_path}")
+        return True
+
     @observability(logger=logger, metrics=metrics, traces=traces)
     @activity.defn
     @auto_heartbeater
     async def fetch_databases(
         self, workflow_args: Dict[str, Any]
     ) -> Optional[ActivityStatistics]:
-        """
-        Extract database metadata (Excel workbook information).
-        
-        Args:
-            workflow_args: The workflow arguments containing file path
-            
-        Returns:
-            Optional[ActivityStatistics]: Statistics about the extraction
-        """
+        """Extract database metadata (Excel workbook information)."""
         try:
-            # Get file path from workflow args
             file_path = workflow_args.get('file_path') or workflow_args.get('credential_guid')
             if not file_path:
                 logger.error("No file path provided in workflow args")
                 return ActivityStatistics(processed_count=0, error_count=1)
-            
-            # Initialize Excel client if not already done
+
             from app.clients import ExcelClient
             excel_client = ExcelClient({'file_path': file_path})
-            
             if not await excel_client.connect():
                 logger.error("Failed to connect to Excel file")
                 return ActivityStatistics(processed_count=0, error_count=1)
-            
+
             file_metadata = excel_client.get_file_metadata()
-            
             database_info = {
                 'database_name': file_metadata.get('file_name', '').replace('.xlsx', '').replace('.xls', '').replace('.csv', ''),
                 'file_path': file_metadata.get('file_path'),
@@ -91,182 +102,133 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                 'modified_date': datetime.fromtimestamp(file_metadata.get('modified_time', 0)),
                 'sheet_count': len(excel_client.get_sheet_names())
             }
-            
-            # Convert to JSON serializable
+
             database_info = self._convert_to_json_serializable(database_info)
-            
-            # Store Excel client and database info for downstream activities
             workflow_args['excel_client'] = excel_client
             workflow_args['database_info'] = database_info
-            
+
             logger.info(f"Extracted database metadata for: {database_info['database_name']}")
             return ActivityStatistics(processed_count=1, error_count=0)
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch database metadata: {str(e)}")
             return ActivityStatistics(processed_count=0, error_count=1)
-    
+
     @observability(logger=logger, metrics=metrics, traces=traces)
     @activity.defn
     @auto_heartbeater
     async def fetch_schemas(
         self, workflow_args: Dict[str, Any]
     ) -> Optional[ActivityStatistics]:
-        """
-        Extract schema metadata (Excel workbook schema).
-        
-        Args:
-            workflow_args: The workflow arguments
-            
-        Returns:
-            Optional[ActivityStatistics]: Statistics about the extraction
-        """
+        """Extract schema metadata (Excel workbook schema)."""
         try:
             database_info = workflow_args.get('database_info', {})
-            
             schema_info = {
                 'schema_name': database_info.get('database_name', 'default_schema'),
                 'database_name': database_info.get('database_name'),
                 'table_count': database_info.get('sheet_count', 0),
                 'file_path': database_info.get('file_path')
             }
-            
-            # Convert to JSON serializable
+
             schema_info = self._convert_to_json_serializable(schema_info)
             workflow_args['schema_info'] = schema_info
-            
+
             logger.info(f"Extracted schema metadata: {schema_info['schema_name']}")
             return ActivityStatistics(processed_count=1, error_count=0)
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch schema metadata: {str(e)}")
             return ActivityStatistics(processed_count=0, error_count=1)
-    
+
     @observability(logger=logger, metrics=metrics, traces=traces)
     @activity.defn
     @auto_heartbeater
     async def fetch_tables(
         self, workflow_args: Dict[str, Any]
     ) -> Optional[ActivityStatistics]:
-        """
-        Extract table metadata (Excel sheets information).
-        
-        Args:
-            workflow_args: The workflow arguments
-            
-        Returns:
-            Optional[ActivityStatistics]: Statistics about the extraction
-        """
+        """Extract table metadata (Excel sheets information)."""
         try:
             excel_client = workflow_args.get('excel_client')
             if not excel_client:
                 logger.error("Excel client not found")
                 return ActivityStatistics(processed_count=0, error_count=1)
-            
+
             sheet_names = excel_client.get_sheet_names()
             tables_info = []
-            
+
             for sheet_name in sheet_names:
                 df = excel_client.get_sheet_data(sheet_name)
                 if df is not None:
-                    # Convert data types to JSON serializable format
                     data_types = {}
                     for col, dtype in df.dtypes.items():
                         data_types[str(col)] = str(dtype)
-                    
+
                     table_info = {
                         'table_name': str(sheet_name),
                         'schema_name': str(workflow_args.get('schema_info', {}).get('schema_name', 'default')),
                         'row_count': int(len(df)),
                         'column_count': int(len(df.columns)),
-                        'has_header': True,  # Assume first row is header
+                        'has_header': True,
                         'data_types': data_types,
                         'memory_usage': int(df.memory_usage(deep=True).sum())
                     }
-                    
-                    # Convert to JSON serializable
+
                     table_info = self._convert_to_json_serializable(table_info)
                     tables_info.append(table_info)
-            
+
             workflow_args['tables_info'] = tables_info
-            
             logger.info(f"Extracted {len(tables_info)} table metadata records")
             return ActivityStatistics(processed_count=len(tables_info), error_count=0)
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch table metadata: {str(e)}")
             return ActivityStatistics(processed_count=0, error_count=1)
-    
+
     @observability(logger=logger, metrics=metrics, traces=traces)
     @activity.defn
     @auto_heartbeater
     async def fetch_columns(
         self, workflow_args: Dict[str, Any]
     ) -> Optional[ActivityStatistics]:
-        """
-        Extract column metadata from Excel sheets.
-        
-        Args:
-            workflow_args: The workflow arguments
-            
-        Returns:
-            Optional[ActivityStatistics]: Statistics about the extraction
-        """
+        """Extract column metadata from Excel sheets."""
         try:
             excel_client = workflow_args.get('excel_client')
             tables_info = workflow_args.get('tables_info', [])
-            
+
             if not excel_client or not tables_info:
                 logger.error("Required data not found in workflow args")
                 return ActivityStatistics(processed_count=0, error_count=1)
-            
+
             columns_info = []
             total_columns = 0
-            
+
             for table_info in tables_info:
                 sheet_name = table_info['table_name']
                 df = excel_client.get_sheet_data(sheet_name)
-                
+
                 if df is not None:
                     for idx, column_name in enumerate(df.columns):
                         column_data = df[column_name]
-                        
-                        # Analyze column data
                         column_metadata = self._analyze_column(
-                            column_data, str(column_name), idx + 1, 
+                            column_data, str(column_name), idx + 1,
                             sheet_name, table_info['schema_name']
                         )
-                        
-                        # Convert to JSON serializable
+
                         column_metadata = self._convert_to_json_serializable(column_metadata)
                         columns_info.append(column_metadata)
                         total_columns += 1
-            
+
             workflow_args['columns_info'] = columns_info
-            
             logger.info(f"Extracted {total_columns} column metadata records")
             return ActivityStatistics(processed_count=total_columns, error_count=0)
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch column metadata: {str(e)}")
             return ActivityStatistics(processed_count=0, error_count=1)
-    
-    def _analyze_column(self, column_data: pd.Series, column_name: str, position: int, 
+
+    def _analyze_column(self, column_data: pd.Series, column_name: str, position: int,
                        table_name: str, schema_name: str) -> Dict[str, Any]:
-        """
-        Analyze individual column and extract metadata.
-        
-        Args:
-            column_data: Pandas Series containing column data
-            column_name: Name of the column
-            position: Column position
-            table_name: Name of the table (sheet)
-            schema_name: Name of the schema
-            
-        Returns:
-            Dict[str, Any]: Column metadata
-        """
-        # Data type mapping
+        """Analyze individual column and extract metadata."""
         dtype_mapping = {
             'int64': 'INTEGER',
             'float64': 'DECIMAL',
@@ -275,8 +237,7 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
             'datetime64[ns]': 'DATETIME',
             'category': 'VARCHAR'
         }
-        
-        # Basic column info
+
         column_info = {
             'table_name': str(table_name),
             'schema_name': str(schema_name),
@@ -285,12 +246,12 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
             'data_type': dtype_mapping.get(str(column_data.dtype), 'VARCHAR'),
             'is_nullable': 'YES' if column_data.isnull().any() else 'NO',
         }
-        
-        # Quality metrics - convert to native Python types
+
+        # Quality metrics
         total_count = int(len(column_data))
         null_count = int(column_data.isnull().sum())
         unique_count = int(column_data.nunique())
-        
+
         column_info.update({
             'total_count': total_count,
             'null_count': null_count,
@@ -298,8 +259,8 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
             'unique_count': unique_count,
             'unique_percentage': round(float((unique_count / total_count) * 100), 2) if total_count > 0 else 0.0,
         })
-        
-        # Determine quality level
+
+        # Quality level
         null_pct = column_info['null_percentage']
         if null_pct <= 10:
             column_info['quality_level'] = 'HIGH'
@@ -307,8 +268,8 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
             column_info['quality_level'] = 'MEDIUM'
         else:
             column_info['quality_level'] = 'LOW'
-        
-        # Additional analysis for numeric columns
+
+        # Numeric analysis
         if pd.api.types.is_numeric_dtype(column_data):
             non_null_data = column_data.dropna()
             if not non_null_data.empty:
@@ -319,10 +280,9 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                         'mean_value': float(non_null_data.mean()),
                     })
                 except (ValueError, TypeError):
-                    # Skip numeric stats if conversion fails
                     pass
-        
-        # Additional analysis for string columns
+
+        # String analysis
         elif pd.api.types.is_string_dtype(column_data) or column_data.dtype == 'object':
             non_null_data = column_data.dropna()
             if not non_null_data.empty:
@@ -334,66 +294,46 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                         'min_length': int(str_lengths.min()),
                     })
                 except (ValueError, TypeError):
-                    # Skip string stats if conversion fails
                     pass
-        
+
         return column_info
-    
+
     @observability(logger=logger, metrics=metrics, traces=traces)
     @activity.defn
     @auto_heartbeater
     async def generate_visualizations(
         self, workflow_args: Dict[str, Any]
     ) -> Optional[ActivityStatistics]:
-        """
-        Generate visualizations from Excel data.
-        
-        Args:
-            workflow_args: The workflow arguments
-            
-        Returns:
-            Optional[ActivityStatistics]: Statistics about visualization generation
-        """
+        """Generate visualizations from Excel data."""
         try:
             excel_client = workflow_args.get('excel_client')
             if not excel_client:
                 logger.error("Excel client not found")
                 return ActivityStatistics(processed_count=0, error_count=1)
-            
+
             visualizations = []
             sheet_names = excel_client.get_sheet_names()
-            
+
             for sheet_name in sheet_names:
                 df = excel_client.get_sheet_data(sheet_name)
                 if df is not None and not df.empty:
-                    # Generate different types of visualizations
                     viz_data = self._generate_sheet_visualizations(df, sheet_name)
                     visualizations.extend(viz_data)
-            
-            # Convert to JSON serializable
+
             visualizations = self._convert_to_json_serializable(visualizations)
             workflow_args['visualizations'] = visualizations
-            
+
             logger.info(f"Generated {len(visualizations)} visualizations")
             return ActivityStatistics(processed_count=len(visualizations), error_count=0)
-            
+
         except Exception as e:
             logger.error(f"Failed to generate visualizations: {str(e)}")
             return ActivityStatistics(processed_count=0, error_count=1)
-    
+
     def _generate_sheet_visualizations(self, df: pd.DataFrame, sheet_name: str) -> List[Dict[str, Any]]:
-        """
-        Generate visualization data for a specific sheet.
-        
-        Args:
-            df: DataFrame containing sheet data
-            sheet_name: Name of the sheet
-            
-        Returns:
-            List[Dict[str, Any]]: List of visualization configurations
-        """
+        """Generate visualization data for a specific sheet."""
         visualizations = []
-        
+
         try:
             # Data quality overview
             quality_viz = {
@@ -406,7 +346,7 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                 }
             }
             visualizations.append(quality_viz)
-            
+
             # Data type distribution
             dtype_counts = df.dtypes.value_counts()
             dtype_viz = {
@@ -418,14 +358,13 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                 }
             }
             visualizations.append(dtype_viz)
-            
+
             # Numeric column statistics
             numeric_columns = df.select_dtypes(include=[np.number]).columns
             if len(numeric_columns) > 0:
                 numeric_stats = df[numeric_columns].describe()
-                
-                # Convert numeric stats to JSON serializable format
                 stats_dict = {}
+                
                 for col in numeric_columns:
                     if col in numeric_stats.columns:
                         col_stats = {}
@@ -437,7 +376,7 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                             except (ValueError, TypeError):
                                 col_stats[str(stat_name)] = 0.0
                         stats_dict[str(col)] = col_stats
-                
+
                 stats_viz = {
                     'type': 'heatmap',
                     'title': f'Numeric Column Statistics - {sheet_name}',
@@ -447,8 +386,38 @@ class ExcelMetadataExtractionActivities(BaseSQLMetadataExtractionActivities):
                     }
                 }
                 visualizations.append(stats_viz)
-        
+
         except Exception as e:
             logger.error(f"Error generating visualizations for {sheet_name}: {str(e)}")
-            
+
         return visualizations
+
+    @observability(logger=logger, metrics=metrics, traces=traces)
+    @activity.defn
+    async def transform_data(self, workflow_args: Dict[str, Any]) -> bool:
+        """Transform extracted data to Atlan format."""
+        try:
+            from app.transformer import ExcelAtlasTransformer
+            
+            transformer = ExcelAtlasTransformer(
+                connector_name="excel-sourcesense", 
+                tenant_id="default"
+            )
+            
+            metadata_for_transform = {
+                'database_info': workflow_args.get('database_info', {}),
+                'schema_info': workflow_args.get('schema_info', {}),
+                'tables_info': workflow_args.get('tables_info', []),
+                'columns_info': workflow_args.get('columns_info', []),
+                'visualizations': workflow_args.get('visualizations', [])
+            }
+            
+            transformed_entities = transformer.transform(metadata_for_transform)
+            workflow_args['transformed_entities'] = transformed_entities
+            
+            logger.info("Successfully transformed metadata to Atlan format")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to transform data: {str(e)}")
+            return False

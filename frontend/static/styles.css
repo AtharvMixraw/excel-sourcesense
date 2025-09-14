@@ -1171,3 +1171,175 @@ body {
         font-size: 11px;
     }
 } 
+/* Add this to your existing styles.css */
+
+.temporal-dashboard, .temporal-fallback {
+    padding: 20px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    margin: 15px 0;
+}
+
+.workflow-details {
+    margin: 15px 0;
+}
+
+.workflow-details code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.running {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.completed {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.dashboard-actions {
+    margin-top: 15px;
+}
+
+.dashboard-actions .btn {
+    margin-right: 10px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: 500;
+}
+
+.btn.btn-primary {
+    background: #007bff;
+    color: white;
+    border: 1px solid #007bff;
+}
+
+.btn.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: 1px solid #6c757d;
+}
+
+.btn.btn-outline-primary {
+    background: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+
+.info-message {
+    background: #e7f3ff;
+    border: 1px solid #b8daff;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 15px 0;
+}
+
+.info-message code {
+    background: #fff;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.business-context-table {
+    overflow-x: auto;
+    margin-top: 15px;
+}
+
+.context-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.context-table th,
+.context-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.context-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.form-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.lineage-empty {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.relationships-list {
+    margin: 20px 0;
+}
+
+.relationship-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.column-name {
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+    margin: 0 10px;
+}
+
+.relationship-type {
+    color: #6c757d;
+    margin-left: auto;
+}
+
+.quality-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.quality-badge.high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.quality-badge.medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.quality-badge.low {
+    background: #f8d7da;
+    color: #721c24;
+}

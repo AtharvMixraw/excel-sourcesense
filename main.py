@@ -26,9 +26,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
+
 logger = get_logger(__name__)
 metrics = get_metrics()
 traces = get_traces()
+
 
 class ExcelSourceSenseApp:
     """
@@ -87,12 +89,35 @@ class ExcelSourceSenseApp:
         @self.app.get("/api/workflow/{workflow_id}/status")
         @observability(logger=logger, metrics=metrics, traces=traces)
         async def get_workflow_status(workflow_id: str):
-            """Get workflow status (simplified for demo)."""
+            """Get workflow status - real Temporal if available, fallback otherwise."""
+            
+            # Try to get real status from Temporal
+            temporal_client = await self.handler._get_temporal_client() if hasattr(self.handler, '_get_temporal_client') else None
+            
+            if temporal_client:
+                try:
+                    handle = temporal_client.get_workflow_handle(workflow_id)
+                    result = await handle.describe()
+                    
+                    return JSONResponse(content={
+                        "workflow_id": workflow_id,
+                        "status": result.status.name.lower(),
+                        "completed": result.status.name in ["COMPLETED", "FAILED", "TERMINATED"],
+                        "temporal_url": f"http://localhost:8233/namespaces/default/workflows/{workflow_id}",
+                        "temporal_available": True,
+                        "error": None
+                    })
+                except Exception as e:
+                    logger.warning(f"Could not get Temporal status for {workflow_id}: {e}")
+            
+            # Fallback response (existing behavior)
             return JSONResponse(content={
                 "workflow_id": workflow_id,
+                "status": "completed",
                 "completed": True,
-                "error": None,
-                "status": "completed"
+                "temporal_url": f"http://localhost:8233/namespaces/default/workflows/{workflow_id}",
+                "temporal_available": False,
+                "error": None
             })
         
         @self.app.get("/api/result/{filename}")
@@ -142,6 +167,7 @@ class ExcelSourceSenseApp:
             """Health check endpoint."""
             return {"status": "healthy", "app": "Excel SourceSense"}
 
+
 @observability(logger=logger, metrics=metrics, traces=traces)
 async def main():
     """Main application entry point."""
@@ -169,6 +195,7 @@ async def main():
     except Exception as e:
         logger.error(f"Failed to start application: {str(e)}")
         raise
+
 
 if __name__ == "__main__":
     asyncio.run(main())

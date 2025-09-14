@@ -595,6 +595,7 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-multipart" },
     { name = "seaborn" },
+    { name = "temporalio" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "xlrd" },
 ]
@@ -624,6 +625,7 @@ requires-dist = [
     { name = "python-dateutil", specifier = ">=2.8.0" },
     { name = "python-multipart", specifier = ">=0.0.6" },
     { name = "seaborn", specifier = ">=0.12.0" },
+    { name = "temporalio", specifier = ">=1.5.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.23.0" },
     { name = "xlrd", specifier = ">=2.0.0" },
 ]

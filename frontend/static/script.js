@@ -24,12 +24,10 @@ function initializeEventListeners() {
     }
     
     if (uploadArea) {
-        // Click to upload
         uploadArea.addEventListener('click', () => {
             if (fileInput) fileInput.click();
         });
         
-        // Drag and drop events
         uploadArea.addEventListener('dragover', handleDragOver);
         uploadArea.addEventListener('dragleave', handleDragLeave);
         uploadArea.addEventListener('drop', handleFileDrop);
@@ -57,16 +55,13 @@ function handleDragLeave(event) {
 function handleFileDrop(event) {
     event.preventDefault();
     uploadArea.classList.remove('dragover');
-    
     const files = event.dataTransfer.files;
     if (files.length > 0) {
         validateAndProcessFile(files[0]);
     }
 }
 
-// File validation and processing
 function validateAndProcessFile(file) {
-    // Validate file type
     const allowedTypes = ['.xlsx', '.xls', '.csv'];
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
     
@@ -75,18 +70,16 @@ function validateAndProcessFile(file) {
         return;
     }
     
-    // Validate file size (50MB limit)
-    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (file.size > maxSize) {
         showError('File size exceeds 50MB limit. Please choose a smaller file.');
         return;
     }
     
-    // Process the file
     uploadFile(file);
 }
 
-// File upload function
+// File upload function - WITH TEMPORAL INTEGRATION
 async function uploadFile(file) {
     try {
         console.log('Starting file upload:', file.name);
@@ -113,9 +106,18 @@ async function uploadFile(file) {
             extractedMetadata = result.result;
             currentWorkflowId = result.workflow_id;
             
+            // IMPORTANT: Store temporal info at the TOP LEVEL of extractedMetadata
+            extractedMetadata.temporal_available = result.temporal_available;
+            extractedMetadata.temporal_dashboard_url = result.temporal_dashboard_url;
+            
+            console.log('Stored workflow data:', {
+                workflow_id: currentWorkflowId,
+                temporal_available: extractedMetadata.temporal_available,
+                temporal_url: extractedMetadata.temporal_dashboard_url
+            });
+            
             updateProgress(100, 'Processing complete!');
             
-            // Show results after brief delay
             setTimeout(() => {
                 showResults();
             }, 1000);
@@ -130,12 +132,11 @@ async function uploadFile(file) {
     }
 }
 
-// Load sample file
+// Load sample file - WITH TEMPORAL INTEGRATION
 async function loadSampleFile(filename) {
     try {
         console.log('Loading sample file:', filename);
         showProcessingStatus();
-        
         updateProgress(25, 'Loading sample file...');
         
         const response = await fetch(`/api/sample/${filename}`, {
@@ -152,6 +153,16 @@ async function loadSampleFile(filename) {
         if (result.success && result.result) {
             extractedMetadata = result.result;
             currentWorkflowId = result.workflow_id;
+            
+            // IMPORTANT: Store temporal info at the TOP LEVEL of extractedMetadata  
+            extractedMetadata.temporal_available = result.temporal_available;
+            extractedMetadata.temporal_dashboard_url = result.temporal_dashboard_url;
+            
+            console.log('Stored sample workflow data:', {
+                workflow_id: currentWorkflowId,
+                temporal_available: extractedMetadata.temporal_available,
+                temporal_url: extractedMetadata.temporal_dashboard_url
+            });
             
             updateProgress(100, 'Processing complete!');
             
@@ -175,7 +186,6 @@ function showProcessingStatus() {
         statusSection.style.display = 'block';
         statusSection.scrollIntoView({ behavior: 'smooth' });
         
-        // Animate through steps
         setTimeout(() => updateProgress(25, 'Extracting metadata...'), 500);
         setTimeout(() => updateProgress(50, 'Analyzing data quality...'), 1000);
         setTimeout(() => updateProgress(75, 'Generating visualizations...'), 1500);
@@ -194,7 +204,6 @@ function updateProgress(percentage, message) {
         statusMessage.textContent = message;
     }
     
-    // Update step indicators
     const steps = ['step1', 'step2', 'step3', 'step4'];
     const stepThresholds = [25, 50, 75, 100];
     
@@ -221,7 +230,7 @@ function hideProcessingStatus() {
     }
 }
 
-// Show results
+// Show results - WITH TEMPORAL INTEGRATION
 function showResults() {
     console.log('Showing results:', extractedMetadata);
     
@@ -229,33 +238,123 @@ function showResults() {
         showError('No metadata extracted from the file');
         return;
     }
-    
+
     hideProcessingStatus();
     
     if (resultsSection) {
         resultsSection.style.display = 'block';
         resultsSection.classList.add('fade-in');
-        
-        // Populate all sections
+
+        // IMPORTANT: Show temporal card FIRST before populating other sections
+        const temporalCard = document.getElementById('temporalCard');
+        if (temporalCard && currentWorkflowId) {
+            temporalCard.style.display = 'block';  // Make sure it's visible
+            
+            console.log('Showing temporal card for workflow:', currentWorkflowId);
+            
+            // Display temporal info immediately
+            displayTemporalInfo({
+                workflow_id: currentWorkflowId,
+                temporal_dashboard_url: extractedMetadata.temporal_dashboard_url || `http://localhost:8233/namespaces/default/workflows/${currentWorkflowId}`,
+                temporal_available: extractedMetadata.temporal_available || false
+            });
+        } else {
+            console.log('Temporal card or workflow ID not found:', { temporalCard, currentWorkflowId });
+        }
+
+        // Populate all other sections
         displayFileOverview();
         displaySchemaInformation();
-        displayBusinessContext();  // NEW
-        displayLineage();          // NEW
+        displayBusinessContext();
+        displayLineage();
         displayDataQuality();
         displayVisualizations();
-        
+
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 }
 
-// NEW: Business context editing
+// Display Temporal Dashboard Info - ENHANCED FROM FIRST VERSION
+function displayTemporalInfo(data) {
+    const temporalInfo = document.getElementById('temporalInfo');
+    if (!temporalInfo) {
+        console.error('temporalInfo div not found!');
+        return;
+    }
+    
+    console.log('Displaying temporal info:', data);
+    console.log('temporalInfo element found:', temporalInfo);
+    
+    if (data.temporal_available) {
+        console.log('Temporal server available - showing full dashboard');
+        temporalInfo.innerHTML = `
+            <div class="temporal-dashboard">
+                <div class="workflow-details">
+                    <p><strong>Workflow ID:</strong> <code>${data.workflow_id}</code></p>
+                    <p><strong>Status:</strong> <span class="status-badge running">Running</span></p>
+                </div>
+                <div class="dashboard-actions">
+                    <a href="${data.temporal_dashboard_url}" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt"></i> Open Temporal Dashboard
+                    </a>
+                    <button onclick="refreshWorkflowStatus('${data.workflow_id}')" class="btn btn-secondary">
+                        <i class="fas fa-sync"></i> Refresh Status
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        console.log('Temporal server not available - showing fallback');
+        temporalInfo.innerHTML = `
+            <div class="temporal-fallback">
+                <div class="workflow-details">
+                    <p><strong>Workflow ID:</strong> <code>${data.workflow_id}</code></p>
+                    <p><strong>Status:</strong> <span class="status-badge completed">Simulated</span></p>
+                </div>
+                <div class="info-message">
+                    <p><i class="fas fa-info-circle"></i> 
+                    Temporal server not running. To enable real-time monitoring:</p>
+                    <code>temporal server start-dev --ui-port 8233</code>
+                </div>
+                <a href="${data.temporal_dashboard_url}" target="_blank" class="btn btn-outline-primary" style="pointer-events: none; opacity: 0.6;">
+                    Dashboard (Requires Temporal Server)
+                </a>
+            </div>
+        `;
+    }
+    
+    console.log('Temporal info updated in DOM');
+}
+
+// Refresh workflow status - FROM FIRST VERSION
+async function refreshWorkflowStatus(workflowId) {
+    try {
+        const response = await fetch(`/api/workflow/${workflowId}/status`);
+        const status = await response.json();
+        
+        console.log('Workflow status:', status);
+        
+        // Update status display
+        const statusBadge = document.querySelector('.status-badge');
+        if (statusBadge) {
+            statusBadge.textContent = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+            statusBadge.className = `status-badge ${status.completed ? 'completed' : 'running'}`;
+        }
+        
+        showToast(`Workflow ${status.status}`, status.completed ? 'success' : 'info');
+        
+    } catch (error) {
+        console.error('Failed to refresh status:', error);
+        showToast('Failed to refresh status', 'error');
+    }
+}
+
+// Business context editing - ENHANCED FROM SECOND VERSION
 function displayBusinessContext() {
     const container = document.getElementById('businessContext');
     if (!container) return;
     
-    // Use columns_info if available, fallback to schema_info
-    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
-    
+    const columns = extractedMetadata.columns_info || [];
     if (columns.length === 0) {
         container.innerHTML = '<p>No column information available for business context.</p>';
         return;
@@ -317,7 +416,7 @@ function displayBusinessContext() {
 }
 
 function saveBusinessContext() {
-    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
+    const columns = extractedMetadata.columns_info || [];
     
     // Update metadata with business context
     document.querySelectorAll('.desc-input').forEach(input => {
@@ -360,9 +459,9 @@ function resetBusinessContext() {
     }
 }
 
-// NEW: Simple lineage detection and visualization
+// Enhanced lineage detection - FROM SECOND VERSION
 function detectRelationships() {
-    const columns = extractedMetadata.columns_info || extractedMetadata.schema_info || [];
+    const columns = extractedMetadata.columns_info || [];
     if (columns.length === 0) return [];
     
     let relationships = [];
@@ -392,7 +491,7 @@ function detectRelationships() {
                     colB.column_name.toLowerCase()
                 );
                 
-                if (similarity > 0.7 && similarity < 1.0) { // Similar but not identical
+                if (similarity > 0.7 && similarity < 1.0) {
                     relationships.push({
                         from: `${colA.table_name}.${colA.column_name}`,
                         to: `${colB.table_name}.${colB.column_name}`,
@@ -403,16 +502,6 @@ function detectRelationships() {
                 }
             }
         });
-    });
-    
-    // Method 3: Foreign key pattern detection (ID fields)
-    const idPattern = /^.*_?id$/i;
-    const foreignKeyPatterns = [];
-    
-    columns.forEach(col => {
-        if (idPattern.test(col.column_name)) {
-            foreignKeyPatterns.push(col);
-        }
     });
     
     // Remove duplicates and sort by strength
@@ -426,46 +515,7 @@ function detectRelationships() {
     });
 }
 
-function calculateStringSimilarity(str1, str2) {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) return 1.0;
-    
-    const editDistance = levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
-}
-
-function levenshteinDistance(str1, str2) {
-    const matrix = [];
-    
-    for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i];
-    }
-    
-    for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j;
-    }
-    
-    for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
-            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
-        }
-    }
-    
-    return matrix[str2.length][str1.length];
-}
-
-// Simplified lineage functions - replace the existing ones
-
+// Enhanced lineage display with visualization - FROM SECOND VERSION
 function displayLineage() {
     const container = document.getElementById('lineageViz');
     if (!container) {
@@ -762,63 +812,105 @@ function showLineageFallback(relationships) {
     }
 }
 
-// Display file overview
-function displayFileOverview() {
-    const container = document.getElementById('fileOverview');
-    if (!container || !extractedMetadata.database_info) {
-        console.log('No file overview container or data');
-        return;
+// String similarity calculation - SHARED UTILITY
+function calculateStringSimilarity(str1, str2) {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+}
+
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
     }
     
-    const data = extractedMetadata.database_info;
-    console.log('Database info:', data);
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
+}
+
+// Display file overview - ENHANCED
+function displayFileOverview() {
+    const container = document.getElementById('fileOverview');
+    if (!container) return;
+
+    const data = extractedMetadata.database_info || {};
     
     container.innerHTML = `
         <div class="overview-item">
-            <i class="fas fa-file"></i>
-            <h4>File Name</h4>
-            <p>${data.database_name || 'Unknown'}</p>
+            <i class="fas fa-database"></i>
+            <div class="overview-content">
+                <h4>Database Name</h4>
+                <p>${data.database_name || 'Unknown'}</p>
+            </div>
         </div>
         <div class="overview-item">
-            <i class="fas fa-hdd"></i>
-            <h4>File Size</h4>
-            <p>${formatFileSize(data.file_size || 0)}</p>
+            <i class="fas fa-weight-hanging"></i>
+            <div class="overview-content">
+                <h4>File Size</h4>
+                <p>${formatFileSize(data.file_size || 0)}</p>
+            </div>
         </div>
         <div class="overview-item">
             <i class="fas fa-table"></i>
-            <h4>Sheets</h4>
-            <p>${data.sheet_count || 0}</p>
+            <div class="overview-content">
+                <h4>Sheets</h4>
+                <p>${data.sheet_count || 0}</p>
+            </div>
         </div>
         <div class="overview-item">
             <i class="fas fa-clock"></i>
-            <h4>Modified</h4>
-            <p>${formatDate(data.modified_date)}</p>
+            <div class="overview-content">
+                <h4>Modified</h4>
+                <p>${formatDate(data.modified_date)}</p>
+            </div>
         </div>
     `;
 }
 
-// Display schema information
+// Display schema information - ENHANCED
 function displaySchemaInformation() {
     displayTables();
     displayColumns();
 }
 
-// Display tables
 function displayTables() {
     const container = document.getElementById('tablesGrid');
-    if (!container || !extractedMetadata.tables_info) {
-        console.log('No tables container or data');
+    if (!container) return;
+    
+    const tables = extractedMetadata.tables_info || [];
+    if (tables.length === 0) {
+        container.innerHTML = '<p>No table information available.</p>';
         return;
     }
-    
-    const tables = extractedMetadata.tables_info;
-    console.log('Tables info:', tables);
     
     container.innerHTML = tables.map(table => `
         <div class="table-card">
             <div class="table-name">
                 <i class="fas fa-table"></i>
-                ${table.table_name}
+                <h4>${table.table_name}</h4>
             </div>
             <div class="table-stats">
                 <div class="stat-item">
@@ -834,19 +926,18 @@ function displayTables() {
     `).join('');
 }
 
-// Display columns
 function displayColumns() {
     const container = document.getElementById('columnsTable');
-    if (!container || !extractedMetadata.columns_info) {
-        console.log('No columns container or data');
+    if (!container) return;
+    
+    const columns = extractedMetadata.columns_info || [];
+    if (columns.length === 0) {
+        container.innerHTML = '<p>No column information available.</p>';
         return;
     }
     
-    const columns = extractedMetadata.columns_info;
-    console.log('Columns info:', columns);
-    
     container.innerHTML = `
-        <table>
+        <table class="columns-table">
             <thead>
                 <tr>
                     <th>Table</th>
@@ -866,14 +957,14 @@ function displayColumns() {
                     <tr>
                         <td>${col.table_name}</td>
                         <td>${col.column_name}</td>
-                        <td><span class="data-type-${col.data_type.toLowerCase()}">${col.data_type}</span></td>
+                        <td><span class="data-type-badge ${col.data_type?.toLowerCase() || 'varchar'}">${col.data_type}</span></td>
                         <td><span class="description">${col.description || '-'}</span></td>
                         <td><span class="tags">${col.tags ? (Array.isArray(col.tags) ? col.tags.join(', ') : col.tags) : '-'}</span></td>
                         <td><span class="owner">${col.owner || '-'}</span></td>
                         <td>${col.is_nullable}</td>
                         <td>${col.unique_percentage || 0}%</td>
                         <td>${col.null_percentage || 0}%</td>
-                        <td><span class="quality-${(col.quality_level || 'medium').toLowerCase()}">${col.quality_level || 'MEDIUM'}</span></td>
+                        <td><span class="quality-badge ${(col.quality_level || 'medium').toLowerCase()}">${col.quality_level || 'MEDIUM'}</span></td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -881,67 +972,82 @@ function displayColumns() {
     `;
 }
 
-// Display data quality
+// Display data quality - ENHANCED
 function displayDataQuality() {
     const container = document.getElementById('qualityMetrics');
-    if (!container || !extractedMetadata.columns_info) {
-        console.log('No quality container or data');
+    if (!container) return;
+
+    const columns = extractedMetadata.columns_info || [];
+    if (columns.length === 0) {
+        container.innerHTML = '<p>No quality metrics available.</p>';
         return;
     }
-    
-    const columns = extractedMetadata.columns_info;
+
+    const qualityCounts = {
+        HIGH: columns.filter(col => col.quality_level === 'HIGH').length,
+        MEDIUM: columns.filter(col => col.quality_level === 'MEDIUM').length,
+        LOW: columns.filter(col => col.quality_level === 'LOW').length
+    };
+
     const totalColumns = columns.length;
-    const highQuality = columns.filter(col => (col.quality_level || 'MEDIUM') === 'HIGH').length;
-    const mediumQuality = columns.filter(col => (col.quality_level || 'MEDIUM') === 'MEDIUM').length;
-    const lowQuality = columns.filter(col => (col.quality_level || 'MEDIUM') === 'LOW').length;
-    
-    const avgNullPercentage = totalColumns > 0 ? 
-        columns.reduce((sum, col) => sum + (col.null_percentage || 0), 0) / totalColumns : 0;
-    const avgUniquePercentage = totalColumns > 0 ? 
-        columns.reduce((sum, col) => sum + (col.unique_percentage || 0), 0) / totalColumns : 0;
-    
-    const overallScore = totalColumns > 0 ? 
-        Math.round((highQuality * 100 + mediumQuality * 70 + lowQuality * 30) / totalColumns) : 0;
-    
+    const avgNullPercentage = columns.reduce((sum, col) => sum + (col.null_percentage || 0), 0) / totalColumns;
+    const avgUniquePercentage = columns.reduce((sum, col) => sum + (col.unique_percentage || 0), 0) / totalColumns;
+
+    // Calculate overall score
+    const overallScore = Math.round((qualityCounts.HIGH * 100 + qualityCounts.MEDIUM * 70 + qualityCounts.LOW * 30) / totalColumns);
+
     container.innerHTML = `
         <div class="quality-item ${getQualityClass(overallScore)}">
-            <div class="quality-score ${getQualityClass(overallScore)}">${overallScore}%</div>
-            <h4>Overall Quality</h4>
+            <i class="fas fa-chart-line"></i>
+            <div class="quality-content">
+                <h4>Overall Quality Score</h4>
+                <p class="quality-score">${overallScore}%</p>
+            </div>
         </div>
         <div class="quality-item">
-            <div class="quality-score high">${highQuality}</div>
-            <h4>High Quality Columns</h4>
+            <i class="fas fa-check-circle"></i>
+            <div class="quality-content">
+                <h4>High Quality Columns</h4>
+                <p>${qualityCounts.HIGH} (${((qualityCounts.HIGH / totalColumns) * 100).toFixed(1)}%)</p>
+            </div>
         </div>
         <div class="quality-item">
-            <div class="quality-score medium">${mediumQuality}</div>
-            <h4>Medium Quality Columns</h4>
+            <i class="fas fa-exclamation-triangle"></i>
+            <div class="quality-content">
+                <h4>Medium Quality Columns</h4>
+                <p>${qualityCounts.MEDIUM} (${((qualityCounts.MEDIUM / totalColumns) * 100).toFixed(1)}%)</p>
+            </div>
         </div>
         <div class="quality-item">
-            <div class="quality-score low">${lowQuality}</div>
-            <h4>Low Quality Columns</h4>
+            <i class="fas fa-times-circle"></i>
+            <div class="quality-content">
+                <h4>Low Quality Columns</h4>
+                <p>${qualityCounts.LOW} (${((qualityCounts.LOW / totalColumns) * 100).toFixed(1)}%)</p>
+            </div>
         </div>
         <div class="quality-item">
-            <div class="quality-score">${avgNullPercentage.toFixed(1)}%</div>
-            <h4>Avg Null Percentage</h4>
+            <i class="fas fa-chart-bar"></i>
+            <div class="quality-content">
+                <h4>Average Completeness</h4>
+                <p>${(100 - avgNullPercentage).toFixed(1)}%</p>
+            </div>
         </div>
         <div class="quality-item">
-            <div class="quality-score">${avgUniquePercentage.toFixed(1)}%</div>
-            <h4>Avg Uniqueness</h4>
+            <i class="fas fa-fingerprint"></i>
+            <div class="quality-content">
+                <h4>Average Uniqueness</h4>
+                <p>${avgUniquePercentage.toFixed(1)}%</p>
+            </div>
         </div>
     `;
 }
 
-// Display visualizations
+// Display visualizations - ENHANCED WITH PLOTLY
 function displayVisualizations() {
     const container = document.getElementById('visualizations');
-    if (!container) {
-        console.log('No visualizations container');
-        return;
-    }
-    
+    if (!container) return;
+
     const visualizations = extractedMetadata.visualizations || [];
-    console.log('Visualizations:', visualizations);
-    
     if (visualizations.length === 0) {
         container.innerHTML = `
             <div class="viz-container">
@@ -953,21 +1059,21 @@ function displayVisualizations() {
         `;
         return;
     }
-    
+
     container.innerHTML = visualizations.map((viz, index) => `
         <div class="viz-container">
             <div class="viz-title">${viz.title}</div>
             <div id="chart-${index}" class="chart-container"></div>
         </div>
     `).join('');
-    
-    // Create charts with Plotly
+
+    // Create charts with Plotly if available
     visualizations.forEach((viz, index) => {
         setTimeout(() => createInteractiveChart(viz, `chart-${index}`), 100 * index);
     });
 }
 
-// Create interactive charts with Plotly
+// Create interactive charts with Plotly - ENHANCED
 function createInteractiveChart(vizData, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -975,6 +1081,7 @@ function createInteractiveChart(vizData, containerId) {
     console.log('Creating chart:', vizData.type, 'for', containerId);
     
     try {
+        // Check if Plotly is available
         if (typeof Plotly !== 'undefined') {
             if (vizData.type === 'bar_chart') {
                 const data = [{
@@ -1094,15 +1201,8 @@ function createInteractiveChart(vizData, containerId) {
                 }
             }
         } else {
-            // Fallback if Plotly is not available
-            container.innerHTML = `
-                <div style="padding: 40px; text-align: center; background: #f8f9fa; border-radius: 8px;">
-                    <i class="fas fa-chart-${vizData.type === 'bar_chart' ? 'bar' : vizData.type === 'pie_chart' ? 'pie' : 'area'}" style="font-size: 2rem; color: #667eea; margin-bottom: 15px;"></i>
-                    <h4>${vizData.title}</h4>
-                    <p>Chart type: ${vizData.type}</p>
-                    <p><em>Loading interactive chart...</em></p>
-                </div>
-            `;
+            // Try to load Plotly from CDN
+            loadPlotlyAndRenderChart(vizData, containerId);
         }
     } catch (error) {
         console.error('Error creating chart:', error);
@@ -1115,21 +1215,53 @@ function createInteractiveChart(vizData, containerId) {
     }
 }
 
-// Tab switching
+function loadPlotlyAndRenderChart(vizData, containerId) {
+    console.log('Loading Plotly from CDN...');
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js';
+    script.onload = () => {
+        console.log('Plotly loaded, creating chart...');
+        createInteractiveChart(vizData, containerId);
+    };
+    script.onerror = () => {
+        console.error('Failed to load Plotly, showing fallback...');
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div style="padding: 40px; text-align: center; background: #f8f9fa; border-radius: 8px;">
+                    <i class="fas fa-chart-${vizData.type === 'bar_chart' ? 'bar' : vizData.type === 'pie_chart' ? 'pie' : 'area'}" style="font-size: 2rem; color: #667eea; margin-bottom: 15px;"></i>
+                    <h4>${vizData.title}</h4>
+                    <p>Chart type: ${vizData.type}</p>
+                    <p><em>Interactive chart unavailable</em></p>
+                </div>
+            `;
+        }
+    };
+    document.head.appendChild(script);
+}
+
+// Tab switching function
 function switchTab(tabName) {
-    // Update tab buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
     
-    // Update tab content
-    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    tabPanes.forEach(pane => pane.classList.remove('active'));
+    
+    // Find and activate the correct tab button
+    const activeButton = document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`);
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+    
+    // Activate the correct content pane
     const targetPane = document.getElementById(`${tabName}Content`);
     if (targetPane) {
         targetPane.classList.add('active');
     }
 }
 
-// Export metadata
+// Export metadata function - ENHANCED
 async function exportMetadata(format) {
     try {
         if (!extractedMetadata || Object.keys(extractedMetadata).length === 0) {
@@ -1140,60 +1272,57 @@ async function exportMetadata(format) {
         const response = await fetch('/api/export', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 metadata: extractedMetadata,
-                format: format
+                format: format,
+                workflow_id: currentWorkflowId
             })
         });
         
-        const data = await response.json();
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
         
-        if (data.success) {
-            // Create downloadable file
-            const mimeType = format === 'json' ? 'application/json' : 'text/csv';
-            const blob = new Blob([data.content], { type: mimeType });
-            const url = window.URL.createObjectURL(blob);
+        const result = await response.json();
+        
+        if (result.success) {
+            // Create download
+            const blob = new Blob([result.content], {
+                type: format === 'json' ? 'application/json' : 'text/csv'
+            });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `metadata_export.${format}`;
+            a.download = `metadata_${currentWorkflowId || 'export'}.${format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            URL.revokeObjectURL(url);
             
-            // Show success message
-            console.log(`Metadata exported as ${format}`);
-        } else {
-            showError('Export failed');
+            showSuccessMessage(`Metadata exported as ${format.toUpperCase()}`);
         }
         
     } catch (error) {
-        showError('Export failed: ' + error.message);
+        console.error('Export error:', error);
+        showError(`Failed to export metadata: ${error.message}`);
     }
 }
 
 // Utility functions
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatDate(dateString) {
-    if (!dateString) return 'Unknown';
-    
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-    } catch (error) {
-        return 'Invalid Date';
-    }
+function formatDate(date) {
+    if (!date) return 'Unknown';
+    const d = new Date(date);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
 }
 
 function getQualityClass(score) {
@@ -1203,14 +1332,15 @@ function getQualityClass(score) {
 }
 
 function showError(message) {
-    console.error('Error:', message);
-    const errorDiv = document.getElementById('errorMessage');
-    if (errorDiv && errorModal) {
-        errorDiv.textContent = message;
-        errorModal.style.display = 'flex';
+    const errorModal = document.getElementById('errorModal');
+    const errorMessage = document.getElementById('errorMessage');
+    if (errorModal && errorMessage) {
+        errorMessage.textContent = message;
+        errorModal.style.display = 'block';
     } else {
         alert(message); // Fallback
     }
+    console.error(message);
 }
 
 function showSuccessMessage(message) {
@@ -1243,33 +1373,24 @@ function showSuccessMessage(message) {
 }
 
 function closeModal() {
+    const errorModal = document.getElementById('errorModal');
     if (errorModal) {
         errorModal.style.display = 'none';
     }
 }
 
+function showToast(message, type = 'info') {
+    console.log(`Toast [${type}]: ${message}`);
+    // Could implement actual toast notifications here
+}
+
 // Close modal when clicking outside
 window.onclick = function(event) {
+    const errorModal = document.getElementById('errorModal');
     if (event.target === errorModal) {
         closeModal();
     }
 }
 
-// Add some loading animations
-function addLoadingAnimation(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.style.opacity = '0.5';
-        element.style.transition = 'opacity 0.3s ease';
-    }
-}
-
-function removeLoadingAnimation(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.style.opacity = '1';
-    }
-}
-
 // Console log for debugging
-console.log('Excel SourceSense script loaded successfully');
+console.log('Excel SourceSense script loaded successfully (Merged Version)');
